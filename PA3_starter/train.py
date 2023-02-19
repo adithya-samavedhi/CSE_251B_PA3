@@ -1,4 +1,5 @@
 from basic_fcn import *
+from resnet34 import *
 from unet_architecture import *
 import sys
 import time
@@ -8,9 +9,10 @@ import gc
 import voc
 import torchvision.transforms as standard_transforms
 import torchvision 
-from torchvision import transforms
+from torchvision import transforms, models
 import torch.optim as optim
 import torch.nn as nn
+from torchsummary import summary
 from util import *
 import numpy as np
 import argparse
@@ -39,8 +41,11 @@ def getClassWeights(train_dataset):
         x = torch.nn.functional.pad(curr_counts,(0,zeros_needed),"constant",0)
         global_arr = global_arr+x
     h = torch.tensor([1,2,3])
-
-    return 1/global_arr
+    global_arr = global_arr.flatten()
+    global_arr = 1/global_arr
+    global_arr = global_arr.tolist()
+    global_arr = [x/sum(global_arr) for x in global_arr]
+    return torch.Tensor(global_arr)
 
 
     raise NotImplementedError
@@ -75,32 +80,23 @@ classWeights = getClassWeights(train_dataset)
 
 
 epochs =20
-
 n_class = 21
-
-fcn_model = FCN(n_class=n_class)
-fcn_model.apply(init_weights)
+global fcn_model
 
 device =   torch.device("cuda" if torch.cuda.is_available() else "cpu")# TODO determine which device to use (cuda or cpu)
-print(device)
-optimizer = optim.Adam(fcn_model.parameters(), lr=0.001) # TODO choose an optimizer
-criterion = nn.CrossEntropyLoss(weight=classWeights).to(device) # TODO Choose an appropriate loss function from https://pytorch.org/docs/stable/_modules/torch/nn/modules/loss.html
-
-fcn_model =  fcn_model.to(device) # TODO transfer the model to the device
+criterion = nn.CrossEntropyLoss(weight=classWeights).to(device) # TODO Choose an appropriate loss function from https://pytorch.org/docs/stable/_modules/torch/nn/modules/loss.html, 
 
 
 # TODO
-def train(fcn_model,args):
+def train(args):
     scheduler = None
     if args.scheduler == 'cosine':
         print("Using Cosine Learning Rate Scheduler")
         scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=1000, eta_min=0, last_epoch=-1, verbose=False)
     best_iou_score = 0.0
 
-    if args.model == 'unet':
-        print("Using UNET architecture")
-        fcn_model = UNet(3,n_class)
-        fcn_model = fcn_model.to(device)
+    optimizer = optim.Adam(fcn_model.parameters(), lr=0.001) # TODO choose an optimizer
+    
 
     for epoch in range(epochs):
         ts = time.time()
@@ -205,15 +201,25 @@ def modelTest():
 if __name__ == "__main__":
 
     parser = argparse.ArgumentParser()
-    parser.add_argument('--scheduler', type=str, default='cosine', help='Specify the learning rate scheduler that you want to use')
-    parser.add_argument('--model', type=str, default='basic_fcn', help = 'Specify the model that you want to use')
-
-
+    parser.add_argument('--scheduler', type=str, default='normal', help='Specify the learning rate scheduler that you want to use')
+    parser.add_argument('--model', type=str, default='transfer_learning', help = 'Specify the model that you want to use')
     args = parser.parse_args()
+
+    if args.model == 'normal':
+        fcn_model = FCN(n_class=n_class)
+        # fcn_model.apply(init_weights)
+    elif args.model == 'unet':
+        print("Using UNET architecture")
+        fcn_model = UNet(3,n_class)    
+    elif args.model == 'transfer_learning':
+        print("Using ResNet34 architecture for encoder")
+        fcn_model = TransferLearningResNet34(n_class=n_class)
+
+    fcn_model = fcn_model.to(device)
 
     val(0)  # show the accuracy before training
     
-    train(fcn_model,args)
+    train(args)
     modelTest()
 
     # housekeeping
