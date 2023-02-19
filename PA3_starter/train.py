@@ -1,4 +1,5 @@
 from basic_fcn import *
+from unet_architecture import *
 import sys
 import time
 from torch.utils.data import DataLoader
@@ -95,6 +96,10 @@ def train(args):
         print("Using Cosine Learning Rate Scheduler")
         scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=1000, eta_min=0, last_epoch=-1, verbose=False)
     best_iou_score = 0.0
+
+    if args.model == 'unet':
+        print("Using UNET architecture")
+        fcn_model = UNet(3,n_class)
 
     for epoch in range(epochs):
         ts = time.time()
@@ -201,6 +206,8 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser()
     parser.add_argument('--scheduler', type=str, default='cosine', help='Specify the learning rate scheduler that you want to use')
+    parser.add_argument('--model', type=str, default='basic_fcn', help = 'Specify the model that you want to use')
+
     args = parser.parse_args()
 
     val(0)  # show the accuracy before training
