@@ -82,15 +82,15 @@ fcn_model = FCN(n_class=n_class)
 fcn_model.apply(init_weights)
 
 device =   torch.device("cuda" if torch.cuda.is_available() else "cpu")# TODO determine which device to use (cuda or cpu)
-
+print(device)
 optimizer = optim.Adam(fcn_model.parameters(), lr=0.001) # TODO choose an optimizer
-criterion = nn.CrossEntropyLoss(weight=classWeights) # TODO Choose an appropriate loss function from https://pytorch.org/docs/stable/_modules/torch/nn/modules/loss.html
+criterion = nn.CrossEntropyLoss(weight=classWeights).to(device) # TODO Choose an appropriate loss function from https://pytorch.org/docs/stable/_modules/torch/nn/modules/loss.html
 
 fcn_model =  fcn_model.to(device) # TODO transfer the model to the device
 
 
 # TODO
-def train(args):
+def train(fcn_model,args):
     scheduler = None
     if args.scheduler == 'cosine':
         print("Using Cosine Learning Rate Scheduler")
@@ -100,6 +100,7 @@ def train(args):
     if args.model == 'unet':
         print("Using UNET architecture")
         fcn_model = UNet(3,n_class)
+        fcn_model = fcn_model.to(device)
 
     for epoch in range(epochs):
         ts = time.time()
@@ -117,7 +118,6 @@ def train(args):
             labels =   labels.to(device) # TODO transfer the labels to the same device as the model's
 
             outputs =  fcn_model.forward(inputs) # TODO  Compute outputs. we will not need to transfer the output, it will be automatically in the same device as the model's!
-
             loss =  criterion(outputs, labels) #TODO  calculate loss
 
             # TODO  backpropagate
@@ -161,7 +161,7 @@ def val(epoch):
             iou_score = iou(outputs, labels)
 
             losses.append(loss)
-            accuracy.append(acc)
+            accuracy.append(acc.cpu())
             mean_iou_scores.append(iou_score)
 
     print(f"Loss at epoch: {epoch} is {np.mean(losses)}")
@@ -208,10 +208,12 @@ if __name__ == "__main__":
     parser.add_argument('--scheduler', type=str, default='cosine', help='Specify the learning rate scheduler that you want to use')
     parser.add_argument('--model', type=str, default='basic_fcn', help = 'Specify the model that you want to use')
 
+
     args = parser.parse_args()
 
     val(0)  # show the accuracy before training
-    train(args)
+    
+    train(fcn_model,args)
     modelTest()
 
     # housekeeping
