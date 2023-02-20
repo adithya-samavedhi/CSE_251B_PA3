@@ -41,5 +41,37 @@ def pixel_acc(pred, target):
 
     return (torch.sum(pred==target)/ pred.numel())*100
     
+def plots(trainEpochLoss, trainEpochAccuracy, valEpochLoss, valEpochAccuracy, earlyStop):
 
+    """
+    Helper function for creating the plots
+    earlyStop is the epoch at which early stop occurred and will correspond to the best model. e.g. earlyStop=-1 means the last epoch was the best one
+    """
+
+    fig1, ax1 = plt.subplots(figsize=((24, 12)))
+    epochs = np.arange(1,len(trainEpochLoss)+1,1)
+    ax1.plot(epochs, trainEpochLoss, 'r', label="Training Loss")
+    ax1.plot(epochs, valEpochLoss, 'g', label="Validation Loss")
+    plt.scatter(epochs[earlyStop],valEpochLoss[earlyStop],marker='x', c='g',s=400,label='Early Stop Epoch')
+    plt.xticks(ticks=np.arange(min(epochs),max(epochs)+1,10), fontsize=35 )
+    plt.yticks(fontsize=35)
+    ax1.set_title('Loss Plots', fontsize=35.0)
+    ax1.set_xlabel('Epochs', fontsize=35.0)
+    ax1.set_ylabel('Cross Entropy Loss', fontsize=35.0)
+    ax1.legend(loc="upper right", fontsize=35.0)
+    plt.savefig(constants.saveLocation+"loss.png")
+    plt.show()
+
+    fig2, ax2 = plt.subplots(figsize=((24, 12)))
+    ax2.plot(epochs, trainEpochAccuracy, 'r', label="Training Accuracy")
+    ax2.plot(epochs, valEpochAccuracy, 'g', label="Validation Accuracy")
+    plt.scatter(epochs[earlyStop], valEpochAccuracy[earlyStop], marker='x', c='g', s=400, label='Early Stop Epoch')
+    plt.xticks(ticks=np.arange(min(epochs),max(epochs)+1,10), fontsize=35)
+    plt.yticks(fontsize=35)
+    ax2.set_title('Accuracy Plots', fontsize=35.0)
+    ax2.set_xlabel('Epochs', fontsize=35.0)
+    ax2.set_ylabel('Accuracy', fontsize=35.0)
+    ax2.legend(loc="lower right", fontsize=35.0)
+    plt.savefig(constants.saveLocation+"accuracy.png")
+    plt.show()
 # [[[1, 1, 1], [1, 1, 1], [1, 1, 1]], [[2, 2, 2], [2, 2, 2], [2, 2, 2]], [[3, 3, 3], [3, 3, 3], [3, 3, 3]]]
