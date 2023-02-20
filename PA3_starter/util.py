@@ -22,9 +22,9 @@ def iou(pred, target, n_classes = 21):
                 iou_class.append(intersection/union)
         # iou_scores = torch.cat((iou_scores, torch.mean(iou_class)), axis=0)
 
-        iou_scores.append(np.mean(iou_class))
+        iou_scores.append(torch.mean(torch.Tensor(iou_class)))
 
-    return np.mean(iou_scores)
+    return torch.mean(torch.Tensor(iou_scores))
 
     # for c in range(n_classes):
     #     intersection = ((pred==c)*(target==c)).sum(dim = 1)

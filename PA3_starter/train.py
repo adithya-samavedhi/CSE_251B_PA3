@@ -13,6 +13,7 @@ from torchvision import transforms, models
 import torch.optim as optim
 import torch.nn as nn
 from torchsummary import summary
+import torchvision.transforms.functional as TF
 from util import *
 import numpy as np
 import argparse
@@ -40,15 +41,19 @@ def getClassWeights(train_dataset):
 
         x = torch.nn.functional.pad(curr_counts,(0,zeros_needed),"constant",0)
         global_arr = global_arr+x
-    h = torch.tensor([1,2,3])
+    # h = torch.tensor([1,2,3])
+
     global_arr = global_arr.flatten()
-    global_arr = 1/global_arr
-    global_arr = global_arr.tolist()
-    global_arr = [x/sum(global_arr) for x in global_arr]
+    total_samples = sum(global_arr.tolist())
+    global_arr = global_arr/total_samples
+    global_arr = 1-global_arr
+    print("******** Class Weights *********",global_arr)
+    return torch.Tensor(global_arr)
+
     return torch.Tensor(global_arr)
 
 
-    raise NotImplementedError
+    # raise NotImplementedError
 
 
 mean_std = ([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
@@ -62,10 +67,15 @@ input_transform = standard_transforms.Compose([
     ])
 
 target_transform = MaskToTensor()
+TF_transform = None
+def transform(args):
+    if args.transform=='true':
+        TF_transform = lambda x : [x, TF.hflip(x), TF.rotate(x.unsqueeze(0), angle = 5, fill=0).squeeze(0), TF.rotate(x.unsqueeze(0), angle = 5, fill=0).squeeze(0)]
+        print("******* Applying Transformations ********",TF_transform)
 
-train_dataset =voc.VOC('train', transform=input_transform, target_transform=target_transform)
-val_dataset = voc.VOC('val', transform=input_transform, target_transform=target_transform)
-test_dataset = voc.VOC('test', transform=input_transform, target_transform=target_transform)
+train_dataset =voc.VOC('train', transform=input_transform, target_transform=target_transform,TF_transform=TF_transform)
+val_dataset = voc.VOC('val', transform=input_transform, target_transform=target_transform,TF_transform=TF_transform)
+test_dataset = voc.VOC('test', transform=input_transform, target_transform=target_transform,TF_transform=TF_transform)
 
 
 print(f"Training data: {len(train_dataset)}")
@@ -178,7 +188,7 @@ def modelTest():
 
     with torch.no_grad():  # we don't need to calculate the gradient in the validation/testing
 
-        for iter, (input, label) in enumerate(test_loader):
+        for iter, (inputs, label) in enumerate(test_loader):
             inputs =  inputs.to(device)# TODO transfer the input to the same device as the model's
             labels =   labels.to(device) # TODO transfer the labels to the same device as the model's
             outputs =  fcn_model.forward(inputs)
@@ -203,7 +213,11 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('--scheduler', type=str, default='normal', help='Specify the learning rate scheduler that you want to use')
     parser.add_argument('--model', type=str, default='transfer_learning', help = 'Specify the model that you want to use')
+    parser.add_argument('--transform',type=str,default='false',help='Specify if you want to add transformations')
     args = parser.parse_args()
+
+    if args.transform=='true':
+        transform(args)
 
     if args.model == 'normal':
         fcn_model = FCN(n_class=n_class)

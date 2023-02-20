@@ -51,13 +51,14 @@ def make_dataset(mode):
 
 
 class VOC(data.Dataset):
-    def __init__(self, mode, transform=None, target_transform=None):
+    def __init__(self, mode, transform=None, target_transform=None, TF_transform=None):
         self.imgs = make_dataset(mode)
         if len(self.imgs) == 0:
             raise RuntimeError('Found 0 images, please check the data set')
         self.mode = mode
         self.transform = transform
         self.target_transform = target_transform
+        self.TF_transform = TF_transform
         self.width = 224
         self.height = 224
 
@@ -71,6 +72,10 @@ class VOC(data.Dataset):
             img = self.transform(img)
         if self.target_transform is not None:
             mask = self.target_transform(mask)
+        if self.TF_transform is not None:
+            img = self.TF_transform(img)
+            mask = self.TF_transform(mask)
+            
 
         mask[mask==ignore_label]=0
 
