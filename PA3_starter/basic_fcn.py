@@ -1,4 +1,5 @@
 import torch.nn as nn
+import pickle
 
 #ToDO Fill in the __ values
 class FCN(nn.Module):
@@ -50,3 +51,29 @@ class FCN(nn.Module):
         score = self.classifier(y5)
 
         return score  # size=(N, n_class, H, W)
+
+    def save(self, filepath="./model.pkl"):
+        """
+        Saves the Network model in the given filepath.
+        Parameters
+        ----------
+        filepath: filepath of the model to be saved
+        Returns
+        -------
+        None
+        """
+        with open(filepath, 'wb') as f:
+            pickle.dump(self, f)
+
+    def load(self, filepath="./model.pkl"):
+        """
+        Loads a pre-trained Network model from the given filepath.
+        Parameters
+        ----------
+        filepath: filepath of the model to be loaded
+        Returns
+        -------
+        model: Loaded Network model
+        """
+        with open(filepath, 'rb') as f:
+            return pickle.load(f)

@@ -13,7 +13,6 @@ from torchvision import transforms, models
 import torch.optim as optim
 import torch.nn as nn
 from torchsummary import summary
-import torchvision.transforms.functional as TF
 from util import *
 import numpy as np
 import argparse
@@ -41,19 +40,47 @@ def getClassWeights(train_dataset):
 
         x = torch.nn.functional.pad(curr_counts,(0,zeros_needed),"constant",0)
         global_arr = global_arr+x
-    # h = torch.tensor([1,2,3])
-
+    h = torch.tensor([1,2,3])
     global_arr = global_arr.flatten()
-    total_samples = sum(global_arr.tolist())
-    global_arr = global_arr/total_samples
-    global_arr = 1-global_arr
-    print("******** Class Weights *********",global_arr)
+    global_arr = 1/global_arr
+    global_arr = global_arr.tolist()
+    global_arr = [x/sum(global_arr) for x in global_arr]
     return torch.Tensor(global_arr)
 
-    return torch.Tensor(global_arr)
+def early_stopping(model, filepath, iter_num, early_stopping_rounds, best_loss, best_acc, best_iou, best_iter, loss, acc, iou, patience):
+    """
+    Implements the early stopping functionality with a loss monitor. If the patience is exhausted it interupts the training process and 
+    returns the best model and its corresponding loss and accuracy score on validation data.
+    Parameters
+    ----------
+    model: Trained model uptill iteration iter_num (epoch number)
+    filepath: Path to save the model at if its the best model (in terms of validation loss) till the current iteration.
+    iter_num: Current epoch number.
+    early_stopping_rounds: User specified hyperparameters that indicates the patience period upper limit.
+    best_loss: Best validation set loss observed till the current iteration.
+    best_acc: Accuracy observed in the iteration with the best validation loss (best_loss).
+    best_iter: Iteration number of best validation loss (best_loss)
+    loss: Current iteration loss on validation data.
+    acc: Current iteration accuracy on validation data.
+    patience: Current patience level. If best_loss is not beaten then patience will be decremented by 1.
+    Returns
+    -------
+    best_loss: Updated best loss after iteration iter_num.
+    best_acc: Correspondingly updated best loss after iteration iter_num.
+    best_iter: Best iteration till iter_num.
+    patience: Updated patience value.
+    """
+    if loss>=best_loss:
+        patience-=1
+    else:
+        model.save(filepath)
+        patience = early_stopping_rounds
+        best_loss = loss
+        best_acc = acc
+        best_iou = iou
+        best_iter = iter_num
 
-
-    # raise NotImplementedError
+    return best_loss, best_acc, best_iou, best_iter, patience
 
 
 mean_std = ([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
@@ -67,15 +94,10 @@ input_transform = standard_transforms.Compose([
     ])
 
 target_transform = MaskToTensor()
-TF_transform = None
-def transform(args):
-    if args.transform=='true':
-        TF_transform = lambda x : [x, TF.hflip(x), TF.rotate(x.unsqueeze(0), angle = 5, fill=0).squeeze(0), TF.rotate(x.unsqueeze(0), angle = 5, fill=0).squeeze(0)]
-        print("******* Applying Transformations ********",TF_transform)
 
-train_dataset =voc.VOC('train', transform=input_transform, target_transform=target_transform,TF_transform=TF_transform)
-val_dataset = voc.VOC('val', transform=input_transform, target_transform=target_transform,TF_transform=TF_transform)
-test_dataset = voc.VOC('test', transform=input_transform, target_transform=target_transform,TF_transform=TF_transform)
+train_dataset =voc.VOC('train', transform=input_transform, target_transform=target_transform)
+val_dataset = voc.VOC('val', transform=input_transform, target_transform=target_transform)
+test_dataset = voc.VOC('test', transform=input_transform, target_transform=target_transform)
 
 
 print(f"Training data: {len(train_dataset)}")
@@ -93,8 +115,8 @@ epochs =20
 n_class = 21
 global fcn_model
 
-device =   torch.device("cuda" if torch.cuda.is_available() else "cpu")# TODO determine which device to use (cuda or cpu)
-criterion = nn.CrossEntropyLoss(weight=classWeights).to(device) # TODO Choose an appropriate loss function from https://pytorch.org/docs/stable/_modules/torch/nn/modules/loss.html, 
+device =   torch.device("cuda:0" if torch.cuda.is_available() else "cpu")# TODO determine which device to use (cuda or cpu)
+criterion = nn.CrossEntropyLoss().to(device) # TODO Choose an appropriate loss function from https://pytorch.org/docs/stable/_modules/torch/nn/modules/loss.html, weight=classWeights
 
 
 # TODO
@@ -104,19 +126,21 @@ def train(args):
         print("Using Cosine Learning Rate Scheduler")
         scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=1000, eta_min=0, last_epoch=-1, verbose=False)
     best_iou_score = 0.0
+    best_pixel_acc = 0.0
 
-    optimizer = optim.Adam(fcn_model.parameters(), lr=0.001) # TODO choose an optimizer
+    optimizer = optim.Adam(fcn_model.parameters(), lr=0.005) # TODO choose an optimizer
     
+    #Initializing early stopping parameters.
+    if args.early_stop:
+            patience = args.early_stop_epoch
+            best_loss = 1e9
+            best_iter = 0
 
     for epoch in range(epochs):
         ts = time.time()
+        losses = []
         for iter, (inputs, labels) in enumerate(train_loader):
 
-            # print(f"inputs:  {inputs.size()}")
-            # print(f"labels:  {labels.size()}")
-            # print(torch.max(labels[0]))
-            # print(torch.min(labels[0]))
-            # TODO  reset optimizer gradients
             optimizer.zero_grad()
 
             # both inputs and labels have to reside in the same device as the model's
@@ -125,28 +149,40 @@ def train(args):
 
             outputs =  fcn_model.forward(inputs) # TODO  Compute outputs. we will not need to transfer the output, it will be automatically in the same device as the model's!
             loss =  criterion(outputs, labels) #TODO  calculate loss
+            losses.append(loss.item())
 
             # TODO  backpropagate
             loss.backward()
 
             # TODO  update the weights
             optimizer.step()
-        if scheduler:
-            scheduler.step()
-            
-
 
             if iter % 10 == 0:
                 print("epoch{}, iter{}, loss: {}, Accuracy: {}, Mean IOU: {}".format(epoch, iter, 
                 loss.item(), pixel_acc(outputs, labels), iou(outputs, labels)))
 
+        if scheduler:
+            scheduler.step()
+
         print("Finish epoch {}, time elapsed {}".format(epoch, time.time() - ts))
 
-        current_miou_score = val(epoch)
+        current_loss, current_acc_score, current_miou_score = val(epoch)
 
-        if current_miou_score > best_iou_score:
-            best_iou_score = current_miou_score
-            # save the best model
+        #Check for Early Stopping
+        if args.early_stop:
+            best_loss, best_pixel_acc, best_iou_score, best_iter, patience = early_stopping(fcn_model, args.filepath, epoch, args.early_stop_epoch, best_loss, best_pixel_acc, best_iou_score,
+                                                                best_iter, current_loss, current_acc_score, current_miou_score, patience)
+            print(f"Patience = {patience}")
+            if patience==0:
+                print(f"Training stopped early at epoch:{epoch}, best_loss = {best_loss}, best_pixel_acc = {best_pixel_acc}, best_iou_score = {best_iou_score}, best_iteration={best_iter}")
+                break
+        else:
+            if current_miou_score > best_iou_score:
+                best_iou_score = current_miou_score
+
+
+            if current_acc_score > best_pixel_acc:
+                best_pixel_acc = current_acc_score
     
  #TODO
 def val(epoch):
@@ -176,10 +212,12 @@ def val(epoch):
 
     fcn_model.train() #TURNING THE TRAIN MODE BACK ON TO ENABLE BATCHNORM/DROPOUT!!
 
-    return np.mean(mean_iou_scores)
+    return np.mean(losses), np.mean(accuracy), np.mean(mean_iou_scores)
 
  #TODO
 def modelTest():
+    global fcn_model
+    fcn_model = fcn_model.load(args.filepath)
     fcn_model.eval()  # Put in eval mode (disables batchnorm/dropout) !
 
     losses = []
@@ -188,16 +226,16 @@ def modelTest():
 
     with torch.no_grad():  # we don't need to calculate the gradient in the validation/testing
 
-        for iter, (inputs, label) in enumerate(test_loader):
-            inputs =  inputs.to(device)# TODO transfer the input to the same device as the model's
-            labels =   labels.to(device) # TODO transfer the labels to the same device as the model's
-            outputs =  fcn_model.forward(inputs)
+        for iter, (inputs, labels) in enumerate(test_loader):
+            inputs = inputs.to(device)# TODO transfer the input to the same device as the model's
+            labels =  labels.to(device) # TODO transfer the labels to the same device as the model's
+            outputs = fcn_model.forward(inputs)
             loss =  criterion(outputs, labels).item()
             acc = pixel_acc(outputs, labels)
             iou_score = iou(outputs, labels)
 
             losses.append(loss)
-            accuracy.append(acc)
+            accuracy.append(acc.cpu())
             mean_iou_scores.append(iou_score)
 
     print(f"Loss: {np.mean(losses)}")
@@ -211,13 +249,12 @@ def modelTest():
 if __name__ == "__main__":
 
     parser = argparse.ArgumentParser()
-    parser.add_argument('--scheduler', type=str, default='normal', help='Specify the learning rate scheduler that you want to use')
-    parser.add_argument('--model', type=str, default='transfer_learning', help = 'Specify the model that you want to use')
-    parser.add_argument('--transform',type=str,default='false',help='Specify if you want to add transformations')
+    parser.add_argument('--scheduler', type=str, default='normal', help='Specify the learning rate scheduler that you want to use. Out of [normal, cosine]')
+    parser.add_argument('--model', type=str, default='normal', help = 'Specify the model that you want to use. Out of [normal, unet, transfer_learning]')
+    parser.add_argument('--filepath', type=str, default='model.pkl', help="Model path to save and load model from.")
+    parser.add_argument('--early-stop', type=bool, default=True, help='Implement early stopping')
+    parser.add_argument('--early-stop-epoch', type=int, default=3, help='Patience period of early stopping')
     args = parser.parse_args()
-
-    if args.transform=='true':
-        transform(args)
 
     if args.model == 'normal':
         fcn_model = FCN(n_class=n_class)

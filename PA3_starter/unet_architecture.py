@@ -1,5 +1,6 @@
 import torch
 import torch.nn as nn
+import pickle
 import torch.nn.functional as F
 
 
@@ -117,3 +118,30 @@ class UNet(nn.Module):
         self.up3 = torch.utils.checkpoint(self.up3)
         self.up4 = torch.utils.checkpoint(self.up4)
         self.outc = torch.utils.checkpoint(self.outc)
+
+
+    def save(self, filepath="./model.pkl"):
+        """
+        Saves the Network model in the given filepath.
+        Parameters
+        ----------
+        filepath: filepath of the model to be saved
+        Returns
+        -------
+        None
+        """
+        with open(filepath, 'wb') as f:
+            pickle.dump(self, f)
+
+    def load(self, filepath="./model.pkl"):
+        """
+        Loads a pre-trained Network model from the given filepath.
+        Parameters
+        ----------
+        filepath: filepath of the model to be loaded
+        Returns
+        -------
+        model: Loaded Network model
+        """
+        with open(filepath, 'rb') as f:
+            return pickle.load(f)
