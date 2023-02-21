@@ -7,6 +7,7 @@ from torch.utils.data import DataLoader
 import torch
 import gc
 import voc
+from voc import *
 import torchvision.transforms as standard_transforms
 import torchvision 
 from torchvision import transforms, models
@@ -106,8 +107,8 @@ print(f"Testing data: {len(test_dataset)}")
 
 
 train_loader = DataLoader(dataset=train_dataset, batch_size= 16, shuffle=True)
-val_loader = DataLoader(dataset=val_dataset, batch_size= 16, shuffle=False)
-test_loader = DataLoader(dataset=test_dataset, batch_size= 16, shuffle=False)
+val_loader = DataLoader(dataset=val_dataset, batch_size= 16, shuffle=True)
+test_loader = DataLoader(dataset=test_dataset, batch_size= 16, shuffle=True)
 classWeights = getClassWeights(train_dataset)
 
 
@@ -122,19 +123,25 @@ criterion = nn.CrossEntropyLoss().to(device) # TODO Choose an appropriate loss f
 # TODO
 def train(args):
     scheduler = None
+
+    optimizer = optim.Adam(fcn_model.parameters(), lr=0.002) # TODO choose an optimizer
+    
     if args.scheduler == 'cosine':
         print("Using Cosine Learning Rate Scheduler")
         scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=1000, eta_min=0, last_epoch=-1, verbose=False)
     best_iou_score = 0.0
     best_pixel_acc = 0.0
 
-    optimizer = optim.Adam(fcn_model.parameters(), lr=0.005) # TODO choose an optimizer
+    
     
     #Initializing early stopping parameters.
     if args.early_stop:
             patience = args.early_stop_epoch
             best_loss = 1e9
             best_iter = 0
+
+    train_epoch_loss =[]
+    val_epoch_loss = []
 
     for epoch in range(epochs):
         ts = time.time()
@@ -164,9 +171,13 @@ def train(args):
         if scheduler:
             scheduler.step()
 
-        print("Finish epoch {}, time elapsed {}".format(epoch, time.time() - ts))
+        print("\nFinish epoch {}, time elapsed {}".format(epoch, time.time() - ts))
 
-        current_loss, current_acc_score, current_miou_score = val(epoch)
+        current_loss, current_acc_score, current_miou_score = val(fcn_model, epoch)
+
+        train_epoch_loss.append(np.mean(losses))
+        val_epoch_loss.append(current_loss)
+
 
         #Check for Early Stopping
         if args.early_stop:
@@ -183,9 +194,12 @@ def train(args):
 
             if current_acc_score > best_pixel_acc:
                 best_pixel_acc = current_acc_score
+
+
+    plots(train_epoch_loss, val_epoch_loss, best_iter, output_dir = "./")
     
  #TODO
-def val(epoch):
+def val(fcn_model,epoch):
     fcn_model.eval() # Put in eval mode (disables batchnorm/dropout) !
     
     losses = []
@@ -199,6 +213,7 @@ def val(epoch):
             labels =   labels.to(device) # TODO transfer the labels to the same device as the model's
             outputs =  fcn_model.forward(inputs)
             loss =  criterion(outputs, labels).item()
+            # print(loss)
             acc = pixel_acc(outputs, labels)
             iou_score = iou(outputs, labels)
 
@@ -208,7 +223,7 @@ def val(epoch):
 
     print(f"Loss at epoch: {epoch} is {np.mean(losses)}")
     print(f"IoU at epoch: {epoch} is {np.mean(mean_iou_scores)}")
-    print(f"Pixel acc at epoch: {epoch} is {np.mean(accuracy)}")
+    print(f"Pixel acc at epoch: {epoch} is {np.mean(accuracy)}\n")
 
     fcn_model.train() #TURNING THE TRAIN MODE BACK ON TO ENABLE BATCHNORM/DROPOUT!!
 
@@ -238,10 +253,12 @@ def modelTest():
             accuracy.append(acc.cpu())
             mean_iou_scores.append(iou_score)
 
+    print("\nTest metrics:")
     print(f"Loss: {np.mean(losses)}")
     print(f"IoU: {np.mean(mean_iou_scores)}")
     print(f"Pixel: {np.mean(accuracy)}")
 
+    plotImages(fcn_model, test_loader)
     fcn_model.train()  #TURNING THE TRAIN MODE BACK ON TO ENABLE BATCHNORM/DROPOUT!!
 
 
@@ -256,6 +273,7 @@ if __name__ == "__main__":
     parser.add_argument('--early-stop-epoch', type=int, default=3, help='Patience period of early stopping')
     args = parser.parse_args()
 
+    args.scheduler = "cosine"
     if args.model == 'normal':
         fcn_model = FCN(n_class=n_class)
         # fcn_model.apply(init_weights)
@@ -268,7 +286,7 @@ if __name__ == "__main__":
 
     fcn_model = fcn_model.to(device)
 
-    val(0)  # show the accuracy before training
+    val(fcn_model, 0)  # show the accuracy before training
     
     train(args)
     modelTest()

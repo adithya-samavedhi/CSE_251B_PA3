@@ -1,6 +1,10 @@
 import os
 from PIL import Image
 from torch.utils import data
+import matplotlib.pyplot as plt
+import matplotlib.image as mpimg
+import torch
+import numpy as np
 
 num_classes = 21
 ignore_label = 255
@@ -18,6 +22,47 @@ palette = [0, 0, 0, 128, 0, 0, 0, 128, 0, 128, 128, 0, 0, 0, 128, 128, 0, 128, 0
            128, 128, 128, 64, 0, 0, 192, 0, 0, 64, 128, 0, 192, 128, 0, 64, 0, 128, 192, 0, 128,
            64, 128, 128, 192, 128, 128, 0, 64, 0, 128, 64, 0, 0, 192, 0, 128, 192, 0, 0, 64, 128]  #3 values- R,G,B for every class. First 3 values for class 0, next 3 for
 #class 1 and so on......
+
+device =   torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+
+def plotImages(fcn_model,test_loader, output_dir='./'):
+    fcn_model.eval()  # Put in eval mode (disables batchnorm/dropout) !
+ 
+ 
+    with torch.no_grad():  # we don't need to calculate the gradient in the validation/testing
+ 
+        for iter, (inputs, labels) in enumerate(test_loader):
+            inputs = inputs.to(device)  # TODO transfer the input to the same device as the model's
+            labels = labels.to(device)  # TODO transfer the labels to the same device as the model's
+            print("input shape", inputs.shape)
+            outputs = fcn_model.forward(inputs)
+            print("output shape before", outputs.shape)
+            outputs = torch.argmax(outputs, dim = 1)
+            print("output shape after", outputs.shape)
+ 
+            inputImage = (inputs[0].permute(1, 2, 0).cpu().numpy())
+            imgplot = plt.imshow(inputImage)
+            fig_name = f"{output_dir}Input.jpg"
+            plt.savefig(fig_name)
+            plt.show()
+
+            output = outputs[0]
+            print("output shapeee", output.shape)
+            new_predictions = np.zeros((output.shape[0], output.shape[1], 3))
+            rows, cols = output.shape[0], output.shape[1]
+            # Rearranging the image here
+            for row in range(rows):
+                for col in range(cols):
+                    idx = int(output[row][col])
+                    new_predictions[row][col][:] = np.asarray(palette[idx*3:idx*3+3])
+ 
+            new_predictions = new_predictions/255
+            imgplot = plt.imshow(new_predictions)
+            fig_name = f"{output_dir}SegmentedOutput.jpg"
+            plt.savefig(fig_name)
+            plt.show()
+ 
+            break
 
 
 def make_dataset(mode):
