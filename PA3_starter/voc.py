@@ -27,7 +27,8 @@ device =   torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 def plotImages(fcn_model,test_loader, output_dir='./'):
     fcn_model.eval()  # Put in eval mode (disables batchnorm/dropout) !
- 
+
+    count = 0
  
     with torch.no_grad():  # we don't need to calculate the gradient in the validation/testing
  
@@ -38,15 +39,34 @@ def plotImages(fcn_model,test_loader, output_dir='./'):
             outputs = fcn_model.forward(inputs)
             print("output shape before", outputs.shape)
             outputs = torch.argmax(outputs, dim = 1)
+            print("output unique",np.unique(outputs.cpu().numpy(), return_counts=True))
             print("output shape after", outputs.shape)
  
             inputImage = (inputs[0].permute(1, 2, 0).cpu().numpy())
             imgplot = plt.imshow(inputImage)
-            fig_name = f"{output_dir}Input.jpg"
+            fig_name = f"{output_dir}Input{count}.jpg"
             plt.savefig(fig_name)
             plt.show()
 
             output = outputs[0]
+            print("output values", output)
+            new_predictions = np.zeros((output.shape[0], output.shape[1], 3))
+            rows, cols = output.shape[0], output.shape[1]
+            # Rearranging the image here
+            for row in range(rows):
+                for col in range(cols):
+                    idx = int(output[row][col])
+                    new_predictions[row][col][:] = np.asarray(palette[idx*3:idx*3+3])
+ 
+            new_predictions = new_predictions/255
+            imgplot = plt.imshow(new_predictions)
+            fig_name = f"{output_dir}SegmentedOutput{count}.jpg"
+            plt.savefig(fig_name)
+            plt.show()
+
+            ##### Target print #####
+
+            output = labels[0]
             print("output shapeee", output.shape)
             new_predictions = np.zeros((output.shape[0], output.shape[1], 3))
             rows, cols = output.shape[0], output.shape[1]
@@ -58,11 +78,12 @@ def plotImages(fcn_model,test_loader, output_dir='./'):
  
             new_predictions = new_predictions/255
             imgplot = plt.imshow(new_predictions)
-            fig_name = f"{output_dir}SegmentedOutput.jpg"
+            fig_name = f"{output_dir}SegmentedTarget{count}.jpg"
             plt.savefig(fig_name)
             plt.show()
- 
-            break
+            count +=1
+            if count >10:
+              break
 
 
 def make_dataset(mode):

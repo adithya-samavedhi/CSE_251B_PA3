@@ -39,13 +39,21 @@ def getClassWeights(train_dataset):
         curr_counts = torch.bincount(b[1][0].flatten()).reshape(1,-1)
         zeros_needed = 21- curr_counts.shape[-1]
 
+        # print(f"curr_outputs : {curr_counts}")
+
         x = torch.nn.functional.pad(curr_counts,(0,zeros_needed),"constant",0)
         global_arr = global_arr+x
+        
+        
     h = torch.tensor([1,2,3])
     global_arr = global_arr.flatten()
-    global_arr = 1/global_arr
-    global_arr = global_arr.tolist()
-    global_arr = [x/sum(global_arr) for x in global_arr]
+    print(f"globl arr: {global_arr}")
+    total_samples = sum(global_arr.tolist())
+    print(f"total_samples: {total_samples}")
+    global_arr = global_arr/total_samples
+    global_arr = 1-global_arr
+    print("******** Class Weights *********",global_arr)
+    # global_arr[15] = 0.2
     return torch.Tensor(global_arr)
 
 def early_stopping(model, filepath, iter_num, early_stopping_rounds, best_loss, best_acc, best_iou, best_iter, loss, acc, iou, patience):
@@ -117,18 +125,18 @@ n_class = 21
 global fcn_model
 
 device =   torch.device("cuda:0" if torch.cuda.is_available() else "cpu")# TODO determine which device to use (cuda or cpu)
-criterion = nn.CrossEntropyLoss().to(device) # TODO Choose an appropriate loss function from https://pytorch.org/docs/stable/_modules/torch/nn/modules/loss.html, weight=classWeights
+criterion = nn.CrossEntropyLoss(weight=classWeights).to(device) # TODO Choose an appropriate loss function from https://pytorch.org/docs/stable/_modules/torch/nn/modules/loss.html, weight=classWeights
 
 
 # TODO
 def train(args):
     scheduler = None
 
-    optimizer = optim.Adam(fcn_model.parameters(), lr=0.002) # TODO choose an optimizer
+    optimizer = optim.AdamW(fcn_model.parameters(), lr=0.0001) # TODO choose an optimizer
     
     if args.scheduler == 'cosine':
         print("Using Cosine Learning Rate Scheduler")
-        scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=1000, eta_min=0, last_epoch=-1, verbose=False)
+        scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=2, eta_min=0, last_epoch=-1, verbose=False)
     best_iou_score = 0.0
     best_pixel_acc = 0.0
 
@@ -267,7 +275,7 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser()
     parser.add_argument('--scheduler', type=str, default='normal', help='Specify the learning rate scheduler that you want to use. Out of [normal, cosine]')
-    parser.add_argument('--model', type=str, default='normal', help = 'Specify the model that you want to use. Out of [normal, unet, transfer_learning]')
+    parser.add_argument('--model', type=str, default='transfer_learning', help = 'Specify the model that you want to use. Out of [normal, unet, transfer_learning]')
     parser.add_argument('--filepath', type=str, default='model.pkl', help="Model path to save and load model from.")
     parser.add_argument('--early-stop', type=bool, default=True, help='Implement early stopping')
     parser.add_argument('--early-stop-epoch', type=int, default=3, help='Patience period of early stopping')
