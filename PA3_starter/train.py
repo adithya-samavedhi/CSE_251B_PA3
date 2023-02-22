@@ -16,6 +16,7 @@ import torch.nn as nn
 from torchsummary import summary
 from util import *
 import numpy as np
+import torchvision.transforms.functional as TF
 import argparse
 
 class MaskToTensor(object):
@@ -103,10 +104,15 @@ input_transform = standard_transforms.Compose([
     ])
 
 target_transform = MaskToTensor()
+TF_transform = None
+def transform(args):
+    if args.transform=='true':
+        TF_transform = lambda x : [x, TF.hflip(x), TF.rotate(x.unsqueeze(0), angle = 5, fill=0).squeeze(0), TF.rotate(x.unsqueeze(0), angle = 5, fill=0).squeeze(0)]
+        print("******* Applying Transformations ********",TF_transform)
 
-train_dataset =voc.VOC('train', transform=input_transform, target_transform=target_transform)
-val_dataset = voc.VOC('val', transform=input_transform, target_transform=target_transform)
-test_dataset = voc.VOC('test', transform=input_transform, target_transform=target_transform)
+train_dataset =voc.VOC('train', transform=input_transform, target_transform=target_transform,TF_transform=TF_transform)
+val_dataset = voc.VOC('val', transform=input_transform, target_transform=target_transform,TF_transform=TF_transform)
+test_dataset = voc.VOC('test', transform=input_transform, target_transform=target_transform,TF_transform=TF_transform)
 
 
 print(f"Training data: {len(train_dataset)}")
@@ -279,7 +285,11 @@ if __name__ == "__main__":
     parser.add_argument('--filepath', type=str, default='model.pkl', help="Model path to save and load model from.")
     parser.add_argument('--early-stop', type=bool, default=True, help='Implement early stopping')
     parser.add_argument('--early-stop-epoch', type=int, default=3, help='Patience period of early stopping')
+    parser.add_argument('--transform',type=str,default='false',help='Specify if you want to add transformations')
     args = parser.parse_args()
+
+    if args.transform=='true':
+        transform(args)
 
     args.scheduler = "cosine"
     if args.model == 'normal':
