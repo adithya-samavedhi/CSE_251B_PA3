@@ -138,12 +138,14 @@ class VOC(data.Dataset):
             img = self.transform(img)
         if self.target_transform is not None:
             mask = self.target_transform(mask)
+            
         if self.TF_transform is not None:
             img = self.TF_transform(img)
             mask = self.TF_transform(mask)
             
-
         mask[mask==ignore_label]=0
+
+        
 
         return img, mask
 

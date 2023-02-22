@@ -110,9 +110,18 @@ def transform(args):
         TF_transform = lambda x : [x, TF.hflip(x), TF.rotate(x.unsqueeze(0), angle = 5, fill=0).squeeze(0), TF.rotate(x.unsqueeze(0), angle = 5, fill=0).squeeze(0)]
         print("******* Applying Transformations ********",TF_transform)
 
-train_dataset =voc.VOC('train', transform=input_transform, target_transform=target_transform,TF_transform=TF_transform)
-val_dataset = voc.VOC('val', transform=input_transform, target_transform=target_transform,TF_transform=TF_transform)
-test_dataset = voc.VOC('test', transform=input_transform, target_transform=target_transform,TF_transform=TF_transform)
+original_train_dataset =voc.VOC('train', transform=input_transform, target_transform=target_transform)
+original_val_dataset = voc.VOC('val', transform=input_transform, target_transform=target_transform)
+original_test_dataset = voc.VOC('test', transform=input_transform, target_transform=target_transform)
+
+transformed_train_dataset =voc.VOC('train', transform=input_transform, target_transform=target_transform,TF_transform=TF_transform)
+transformed_val_dataset = voc.VOC('val', transform=input_transform, target_transform=target_transform,TF_transform=TF_transform)
+transformed_test_dataset = voc.VOC('test', transform=input_transform, target_transform=target_transform,TF_transform=TF_transform)
+
+train_dataset = torch.utils.data.ConcatDataset([transformed_train_dataset,original_train_dataset])
+val_dataset = torch.utils.data.ConcatDataset([transformed_val_dataset,original_val_dataset])
+test_dataset = torch.utils.data.ConcatDataset([transformed_test_dataset,original_test_dataset])
+
 
 
 print(f"Training data: {len(train_dataset)}")
@@ -138,7 +147,7 @@ criterion = nn.CrossEntropyLoss(weight=classWeights).to(device) # TODO Choose an
 def train(args):
     scheduler = None
 
-    optimizer = optim.AdamW(fcn_model.parameters(), lr=0.002) # TODO choose an optimizer
+    optimizer = optim.AdamW(fcn_model.parameters(), lr=0.001) # TODO choose an optimizer
     
     if args.scheduler == 'cosine':
         print("Using Cosine Learning Rate Scheduler")
