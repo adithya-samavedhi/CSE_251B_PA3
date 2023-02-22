@@ -138,11 +138,11 @@ criterion = nn.CrossEntropyLoss(weight=classWeights).to(device) # TODO Choose an
 def train(args):
     scheduler = None
 
-    optimizer = optim.AdamW(fcn_model.parameters(), lr=0.0001) # TODO choose an optimizer
+    optimizer = optim.AdamW(fcn_model.parameters(), lr=0.002) # TODO choose an optimizer
     
     if args.scheduler == 'cosine':
         print("Using Cosine Learning Rate Scheduler")
-        scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=2, eta_min=0, last_epoch=-1, verbose=False)
+        scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=15, eta_min=0, last_epoch=-1, verbose=False)
     best_iou_score = 0.0
     best_pixel_acc = 0.0
 
@@ -281,7 +281,7 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser()
     parser.add_argument('--scheduler', type=str, default='normal', help='Specify the learning rate scheduler that you want to use. Out of [normal, cosine]')
-    parser.add_argument('--model', type=str, default='transfer_learning', help = 'Specify the model that you want to use. Out of [normal, unet, transfer_learning]')
+    parser.add_argument('--model', type=str, default='normal', help = 'Specify the model that you want to use. Out of [normal, unet, transfer_learning]')
     parser.add_argument('--filepath', type=str, default='model.pkl', help="Model path to save and load model from.")
     parser.add_argument('--early-stop', type=bool, default=True, help='Implement early stopping')
     parser.add_argument('--early-stop-epoch', type=int, default=3, help='Patience period of early stopping')
