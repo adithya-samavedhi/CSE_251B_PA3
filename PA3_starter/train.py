@@ -1,6 +1,7 @@
 from basic_fcn import *
 from resnet34 import *
 from unet_architecture import *
+from custom import *
 import sys
 import time
 from torch.utils.data import DataLoader
@@ -126,7 +127,7 @@ def train(args):
 
     optimizer = optim.Adam(fcn_model.parameters(), lr=0.002) # TODO choose an optimizer
     
-    if args.scheduler == 'cosine':
+    if args.scheduler=='cosine':
         print("Using Cosine Learning Rate Scheduler")
         scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=1000, eta_min=0, last_epoch=-1, verbose=False)
     best_iou_score = 0.0
@@ -273,7 +274,6 @@ if __name__ == "__main__":
     parser.add_argument('--early-stop-epoch', type=int, default=3, help='Patience period of early stopping')
     args = parser.parse_args()
 
-    args.scheduler = "cosine"
     if args.model == 'normal':
         fcn_model = FCN(n_class=n_class)
         # fcn_model.apply(init_weights)
@@ -283,6 +283,9 @@ if __name__ == "__main__":
     elif args.model == 'transfer_learning':
         print("Using ResNet34 architecture for encoder")
         fcn_model = TransferLearningResNet34(n_class=n_class)
+    elif args.model == 'custom':
+        print("Using custom architecture")
+        fcn_model = CustomModel(n_class=n_class)
 
     fcn_model = fcn_model.to(device)
 
