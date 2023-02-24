@@ -87,10 +87,7 @@ def early_stopping(model, filepath, iter_num, early_stopping_rounds, best_loss, 
 
 mean_std = ([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
 input_transform = standard_transforms.Compose([
-        # transforms.Resize(256),
-        # transforms.CenterCrop(224),
-        # transforms.RandomHorizontalFlip(p=0.5),
-        # transforms.RandomRotation(degrees=45),
+        transforms.CenterCrop(224),
         standard_transforms.ToTensor(),
         standard_transforms.Normalize(*mean_std)
     ])
