@@ -26,9 +26,9 @@ class FCN(nn.Module):
         self.bn3 = nn.BatchNorm2d(128)
         self.deconv4 = nn.ConvTranspose2d(128, 64, kernel_size=3, stride=2, padding=1, dilation=1, output_padding=1)
         self.bn4 = nn.BatchNorm2d(64)
-        self.deconv5 = nn.ConvTranspose2d(64,64, kernel_size=3, stride=2, padding=1, dilation=1, output_padding=1)
-        self.bn5 = nn.BatchNorm2d(64)
-        self.classifier = nn.Conv2d(64, self.n_class, kernel_size=1)
+        self.deconv5 = nn.ConvTranspose2d(64,32, kernel_size=3, stride=2, padding=1, dilation=1, output_padding=1)
+        self.bn5 = nn.BatchNorm2d(32)
+        self.classifier = nn.Conv2d(32, self.n_class, kernel_size=1)
 
 #TODO Complete the forward pass
     def forward(self, x):
