@@ -15,7 +15,7 @@
 # Instructions to run
 python CSE_251B_PA3/PA3_starter/download.py # One-time dataset download
 
-!python CSE_251B_PA3/PA3_starter/train.py [args]
+python CSE_251B_PA3/PA3_starter/train.py [args]
 
 The arguments and their corresponding values are as follows:
 1. scheduler: normal (default) , cosine 
